@@ -1,7 +1,8 @@
 mod hook_procedure;
 mod structs;
 
-use std::io::{self, Write};
+use std::io::{self, BufReader, Read, Write};
+use std::fs::File;
 use std::process;
 use clap::Parser;
 use structs::Commands;
@@ -61,7 +62,25 @@ fn handle_commands(command: Commands) {
         }
         Commands::ShowLogs => {
             println!("Showing logs...");
-            // Logic to show logs would go here
+            if let Err(error) = read_logs() {
+                println!("Error: {}", error); // TODO: Add flag for verbose and non verbose errors.
+            }
         }
     }
+}
+
+fn read_logs() -> io::Result<()> {
+    let file = File::open("keylog.txt")?;
+    
+    let mut reader = BufReader::new(file);
+    let mut contents = String::new();
+    reader.read_to_string(&mut contents)?;
+
+    if contents.len() == 0 {
+        println!("No logs were found...");
+    } else {
+        println!("{}", contents);
+    }
+
+    Ok(())
 }
