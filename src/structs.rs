@@ -14,7 +14,10 @@ pub enum Commands {
     /// Stops key listener
     StopKeyListener,
     /// Reveals keylogger logs
-    ShowLogs,
+    ShowLogs {
+        #[arg[short = 'v', long = "verbose"]]
+        verbose: bool
+    },
     /// Quit Program
     QuitProgram,
 }

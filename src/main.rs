@@ -60,27 +60,37 @@ fn handle_commands(command: Commands) {
             println!("Stopping key listener...");
             // Logic to stop the key listener would go here
         }
-        Commands::ShowLogs => {
+        Commands::ShowLogs { verbose } => {
             println!("Showing logs...");
-            if let Err(error) = read_logs() {
+            if let Err(error) = read_logs(verbose) {
                 println!("Error: {}", error); // TODO: Add flag for verbose and non verbose errors.
             }
         }
     }
 }
 
-fn read_logs() -> io::Result<()> {
+fn read_logs(verbose: bool) -> io::Result<()> {
     let file = File::open("keylog.txt")?;
     
-    let mut reader = BufReader::new(file);
+    let mut reader = BufReader::new(&file);
     let mut contents = String::new();
     reader.read_to_string(&mut contents)?;
 
     if contents.len() == 0 {
         println!("No logs were found...");
-    } else {
-        println!("{}", contents);
+        return Ok(())
     }
+
+    if verbose {
+        use chrono::prelude::DateTime;
+        use chrono::Utc;
+        let metadata = file.metadata()?;
+        let datetime = DateTime::<Utc>::from(metadata.modified()?).format("%Y-%m-%d %H:%M:%S.%f");
+        
+        contents.push_str(&format!("\n\nfile size: {} bytes\nlast date modified: {}", metadata.len(), datetime));
+    }
+    
+    println!("{}", contents);
 
     Ok(())
 }
