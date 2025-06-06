@@ -212,7 +212,6 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
- "log",
  "once_cell",
  "shlex",
  "windows-sys",

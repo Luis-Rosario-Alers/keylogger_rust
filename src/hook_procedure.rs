@@ -9,6 +9,7 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyboardLayout, GetKeyboardState, ToUnicodeEx, VK_ESCAPE};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_SHIFT, VK_CAPITAL};
+use crate::process_identification::{display_focused_process_name};
 
 // Static means that it lasts the entire duration of the program.
 static KEY_BUFFER: Lazy<Mutex<Vec<u16>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -29,6 +30,7 @@ pub unsafe extern "system" fn keyboard_procedure(
                     io::stdout().flush().unwrap()
                 } else {
                     process_keyboard_input(l_param);
+                    display_focused_process_name();
                 }
             }
         }
