@@ -5,6 +5,7 @@ use windows_sys::Win32::System::ProcessStatus::GetModuleBaseNameW;
 use windows_sys::Win32::Foundation::{CloseHandle};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use crate::formatting::update_process_header;
 
 static LAST_PROCESS_NAME: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::new()));
 static mut FIRST_CALL_FLAG: bool = true;
@@ -77,32 +78,16 @@ pub fn display_focused_process_name() {
         match get_focused_process_name() {
             Ok(None) => (),
             Ok(name) => {
-                redraw_header(&name.unwrap());
+                update_process_header(&name.unwrap());
             }
             Err(e) => eprintln!("Error retrieving focused process name: {}", e),
         }
     }
 }
 
+
 pub fn reset_first_call_flag() {
     unsafe {
         FIRST_CALL_FLAG = true;
     }
-}
-
-fn redraw_header(process_name: &str) {
-    // I have to write this for my own memory and sanity...
-    print!("\x1B[s"); // Saves the current cursor position
-
-    print!("\x1B[H"); // Move the cursor to the top left corner
-
-    // Print header with background color and text color
-    print!("\x1B[44m\x1B[37m"); // Blue background, white text
-    println!("🎧 Keylogger Active - Current Process: {:<30}\x1B[0m", process_name);
-    print!("\x1B[0m"); // Reset colors
-
-    // Restore cursor position
-    print!("\x1B[u");
-
-    std::io::stdout().flush().unwrap(); // Ensure the output is flushed to the terminal
 }

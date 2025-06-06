@@ -1,6 +1,7 @@
 mod hook_procedure;
 mod structs;
 mod process_identification;
+mod formatting;
 
 use std::io::{self, BufReader, Read, Write};
 use std::fs::File;

