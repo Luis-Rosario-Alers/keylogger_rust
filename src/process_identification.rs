@@ -73,15 +73,13 @@ fn get_focused_process_name() -> Result<Option<String>, Box<dyn std::error::Erro
 }
 
 pub fn display_focused_process_name() {
-    unsafe {
         match get_focused_process_name() {
             Ok(None) => (),
             Ok(name) => {
-                update_process_header(&name.unwrap());
+                update_process_header(&name.unwrap()).unwrap();
             }
             Err(e) => eprintln!("Error retrieving focused process name: {}", e),
         }
-    }
 }
 
 
