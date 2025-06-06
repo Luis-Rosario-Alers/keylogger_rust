@@ -11,9 +11,10 @@ use hook_procedure::run_keylogger;
 use crate::structs::KeyloggerCommands;
 
 fn main() {
-    println!("Welcome to the keylogger!");
+    println!("🔐 Welcome to the Rust Keylogger!");
+    println!("═══════════════════════════════════");
     loop {
-        print!("logger (;> ");
+        print!("keylogger ➤");
         io::stdout().flush().unwrap();
 
         let mut command = String::new();
@@ -31,18 +32,17 @@ fn main() {
         let args = match shlex::split(command) {
             Some(args) => args,
             None => {
-                println!("Invalid command syntax");
+                println!("❌ Invalid command syntax");
                 continue;
             }
         };
 
         let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
         
-
         // Pre append "logger" first so that our command doesn't get omitted as the first argument.
         match KeyloggerCommands::try_parse_from(std::iter::once("logger").chain(args_refs)) {
             Ok(cmd) => handle_commands(cmd.command),
-            Err(error) => println!("Error: {}", error),
+            Err(error) => println!("❌ Error: {}", error),
         }
     }
 }
@@ -50,21 +50,24 @@ fn main() {
 fn handle_commands(command: Commands) {
     match command {
         Commands::QuitProgram => {
-            println!("Exiting program...");
+            println!("👋 Exiting program...");
             process::exit(0);
         }
         Commands::StartKeyListener => {
-            println!("Starting key listener...");
+            println!("🎧 Starting key listener...");
+            println!("Press ESCAPE to stop monitoring");
+            println!("═══════════════════════════════════");
             run_keylogger();
         }
         Commands::StopKeyListener => {
-            println!("Stopping key listener...");
+            println!("⏹️  Stopping key listener...");
             // Logic to stop the key listener would go here
         }
         Commands::ShowLogs { verbose } => {
-            println!("Showing logs...");
+            println!("📋 Showing logs...");
+            println!("═══════════════════════════════════");
             if let Err(error) = read_logs(verbose) {
-                println!("Error: {}", error); // TODO: Add flag for verbose and non verbose errors.
+                println!("❌ Error: {}", error);
             }
         }
     }
