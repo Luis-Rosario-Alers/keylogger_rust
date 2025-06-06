@@ -1,4 +1,3 @@
-use std::io::Write;
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 use windows_sys::Win32::System::ProcessStatus::GetModuleBaseNameW;
