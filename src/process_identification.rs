@@ -1,7 +1,7 @@
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 use windows_sys::Win32::System::ProcessStatus::GetModuleBaseNameW;
-use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, HMODULE};
+use windows_sys::Win32::Foundation::{CloseHandle};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
@@ -80,5 +80,11 @@ pub fn display_focused_process_name() {
             }
             Err(e) => eprintln!("Error retrieving focused process name: {}", e),
         }
+    }
+}
+
+pub fn reset_first_call_flag() {
+    unsafe {
+        FIRST_CALL_FLAG = true;
     }
 }
