@@ -69,6 +69,7 @@ fn handle_commands(command: Commands) {
             if let Err(error) = read_logs(verbose) {
                 println!("❌ Error: {}", error);
             }
+            println!("═══════════════════════════════════");
         }
     }
 }
