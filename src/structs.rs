@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::fs::OpenOptions;
 use std::io::Write;
 use once_cell::sync::Lazy;
-
+use crate::formatting::update_status_header;
 
 #[derive(Parser, Debug)]
 #[command(name = "")]
@@ -57,6 +57,7 @@ impl KeyBuffer {
         }
         
         self.buffer.extend_from_slice(chars);
+
         Ok(())
     }
     
@@ -81,6 +82,7 @@ impl KeyBuffer {
         file.flush()?;
         
         self.buffer.clear();
+        update_status_header("💾 Saved Buffer").unwrap();
         Ok(())
     }
     

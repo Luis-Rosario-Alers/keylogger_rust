@@ -24,7 +24,9 @@ pub unsafe extern "system" fn keyboard_procedure(
         if n_code == HC_ACTION as i32 {
             if w_param == WM_KEYDOWN as usize ||
                 w_param == WM_SYSKEYDOWN as usize {
-                update_status_header("🧏 Listening").unwrap();
+                update_status_header("🧏 Listening").unwrap_or_else(|e| {
+                    eprintln!("Failed to update status header: {}", e);
+                });
                 if (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u16 == VK_ESCAPE {
                     process_escape_key();
                     stdout().flush().unwrap()
@@ -89,7 +91,6 @@ fn log_keyboard_input(chars: &[u16]) {
         eprintln!("Failed to push characters to buffer: {}", e);
     });
     
-    update_status_header("💾 Saved Buffer").unwrap();
     stdout().flush().unwrap();
 }
 
