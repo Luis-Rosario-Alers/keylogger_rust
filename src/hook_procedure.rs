@@ -1,5 +1,5 @@
 use crate::formatting::{clear_current_line, initialize_header, update_status_header};
-use crate::process_identification::{display_focused_process_name, reset_first_call_flag};
+use crate::process_identification::{display_focused_process_name};
 use crate::structs::GLOBAL_KEY_BUFFER;
 use crossterm::cursor::{position, MoveTo};
 use crossterm::ExecutableCommand;
@@ -27,7 +27,6 @@ pub unsafe extern "system" fn keyboard_procedure(
                 update_status_header("🧏 Listening").unwrap();
                 if (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u16 == VK_ESCAPE {
                     process_escape_key();
-                    reset_first_call_flag();
                     stdout().flush().unwrap()
                 } else {
                     display_focused_process_name();
