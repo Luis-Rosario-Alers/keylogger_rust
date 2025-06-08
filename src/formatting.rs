@@ -49,7 +49,7 @@ pub fn initialize_header() -> Result<(), Box<dyn std::error::Error>> {
         .execute(MoveTo(0, 0))?
         .execute(SetBackgroundColor(Color::Blue))?
         .execute(SetForegroundColor(Color::White))?
-        .execute(Print(format!("🎧 Rust Keylogger - Started: {} - User: [PLACEHOLDER]", timestamp)))?
+        .execute(Print(format!("🎧 Rust Keylogger - Started: {}", timestamp)))?
         .execute(ResetColor)?
         .execute(Print("\n"))?
         .execute(Print("═".repeat(80)))?
