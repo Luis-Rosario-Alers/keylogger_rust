@@ -95,7 +95,7 @@ pub fn display_focused_process_name() {
             // We flush the buffer to ensure that "Abc" is logged under "Process1" before
             // we start logging under "Process2" and accepting new characters.
 
-            if let Err(e) = flush_buffer_for_process_change() {
+            if let Err(e) = flush_buffer_for_process_change(Some(true)) {
                 eprintln!("Error flushing buffer for process change: {}", e);
             }
         }
@@ -119,9 +119,9 @@ pub fn display_focused_process_name() {
     }
 }
 
-fn flush_buffer_for_process_change() -> Result<(), Box<dyn std::error::Error>> {
+fn flush_buffer_for_process_change(process_changed: Option<bool>) -> Result<(), Box<dyn std::error::Error>> {
     GLOBAL_KEY_BUFFER.lock()
         .map_err(|_| "Failed to acquire buffer lock")?
-        .flush_to_disk()
+        .flush_to_disk(process_changed)
         .map_err(|e| format!("Failed to flush key buffer: {}", e).into())
 }
