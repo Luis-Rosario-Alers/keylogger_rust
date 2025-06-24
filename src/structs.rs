@@ -127,3 +127,50 @@ impl KeyBuffer {
 pub static GLOBAL_KEY_BUFFER: Lazy<Mutex<KeyBuffer>> = Lazy::new(|| {
     Mutex::new(KeyBuffer::new())
 });
+
+#[cfg(test)]
+mod tests {
+    use std::any::{Any, TypeId};
+    use super::*;
+    
+    
+    #[test]
+    fn test_keybuffer_has_correct_default_datatypes() {
+        let key_buffer = KeyBuffer::new();
+        assert_eq!(key_buffer.max_size.type_id(), TypeId::of::<usize>());
+        assert_eq!(key_buffer.buffer.type_id(), TypeId::of::<Vec<u16>>());
+        assert_eq!(key_buffer.log_file_path.type_id(), TypeId::of::<String>());
+    }
+    #[test]
+    fn test_keybuffer_has_correct_default_params() {
+        let key_buffer = KeyBuffer::new();
+        assert_eq!(key_buffer.max_size, 8);
+        assert_eq!(key_buffer.buffer.capacity(), 8);
+        assert_eq!(key_buffer.log_file_path, "keylog.txt");
+    }
+    #[test]
+    fn test_keybuffer_with_capacity_initialization() {
+        let key_buffer = KeyBuffer::with_capacity(16, "custom_log.txt");
+        assert_eq!(key_buffer.max_size, 16);
+        assert_eq!(key_buffer.buffer.capacity(), 16);
+        assert_eq!(key_buffer.log_file_path, "custom_log.txt");
+    }
+    #[test]
+    fn test_keybuffer_successfully_pushes_chars() {
+        let mut key_buffer = KeyBuffer::new();
+        let chars = vec![65u16, 66u16, 67u16]; // 'A', 'B', 'C'
+        let result = key_buffer.push_chars(&chars);
+        assert!(result.is_ok());
+        
+        // Check buffer content
+        assert_eq!(key_buffer.buffer, chars);
+    }
+    #[test]
+    fn test_keybuffer_flush_to_disk_empty_buffer() {
+        
+        let mut key_buffer = KeyBuffer::new();
+        let result = key_buffer.flush_to_disk(None, None);
+        assert!(result.is_ok());
+        assert!(key_buffer.is_empty());
+    }
+}
